@@ -1,30 +1,87 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import { Button, StyleSheet, Text, TextInput, View, TouchableOpacity } from "react-native";
+import { useState, useEffect } from "react";
+import { StyleSheet, Text, TextInput, View, TouchableOpacity, Alert, FlatList,  Pressable } from "react-native";
+import * as Calendar from "expo-calendar";
+import TaskListItem from "./TaskListItem";
 
 export default function App() {
   const [todoList, setTodoList] = useState([]);
   const [todo, setTodo] = useState("");
-  const [completedList, setCompletedList] = useState([]);
+  const [calendarId, setCalendarId] = useState(null);
+  const [calendarEvents, setCalendarEvents] = useState([]);
 
-  const submit = () => {
-    if (todo.trim() !== "") {
-      setTodoList((currentList) => [...currentList, todo]);
-      setTodo("");
+  useEffect(() => {
+    (async () => {
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status === "granted") {
+        const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+
+        const defaultCalendar = calendars.find((cal) => cal.allowsModifications); 
+        if (defaultCalendar) {
+          setCalendarId(defaultCalendar.id);
+          fetchCalendarEvents(defaultCalendar.id); 
+        } else {
+          Alert.alert("No Calendar Found", "Please create or allow modification for a calendar.");
+        }
+      } else {
+        Alert.alert("Permission Denied", "Calendar access is required to sync tasks.");
+      }
+    })();
+  }, []);
+
+  const fetchCalendarEvents = async (id) => {
+    try {
+      const startDate = new Date(new Date().setDate(new Date().getDate() - 1)); // solo di oggi
+      const endDate = new Date(new Date().setDate(new Date().getDate() + 2)); // 30 giorni dopo
+      const events = await Calendar.getEventsAsync([id], startDate, endDate);
+      setCalendarEvents(events);
+      console.log("Calendar Events:", events);
+    } catch (error) {
+      console.error("Error fetching calendar events:", error);
     }
   };
 
-  const deleteTodo = (index) => {
-    let newTodoList = [...todoList];
-    newTodoList.splice(index, 1);
-    setTodoList(newTodoList);
+
+  const deleteTaskFromCalendar = async (id) => {
+    try {
+      await Calendar.deleteEventAsync(id);
+      Alert.alert("Success", "Task removed from calendar!");
+      fetchCalendarEvents(calendarId); 
+    } catch (error) {
+      console.error("Error deleting task from calendar:", error
+      );
+    }
+  }
+
+
+  const addTaskToCalendar = async (task) => {
+    if (!calendarId) {
+      Alert.alert("Non hai attivato alcun calendario.");
+      return;
+    }
+
+    const eventDetails = {
+      title: task,
+      startDate: new Date(),
+      endDate: new Date(new Date().getTime() + 60 * 60 * 1000), 
+      timeZone: "GMT",
+      location: "Your location",
+    };
+
+    try {
+      await Calendar.createEventAsync(calendarId, eventDetails);
+      Alert.alert("Success", "Task added to calendar!");
+      fetchCalendarEvents(calendarId); 
+    } catch (error) {
+      console.error("Error adding task to calendar:", error);
+    }
   };
 
-  const completeTodo = (index) => {
-    setCompletedList([...completedList, todoList[index]]);
-    let newTodoList = [...todoList];
-    newTodoList.splice(index, 1);
-    setTodoList(newTodoList);
+  const submit = () => {
+    if (todo.trim() !== "") {
+      addTaskToCalendar(todo); 
+      setTodo(""); 
+    }
   };
 
   return (
@@ -37,54 +94,29 @@ export default function App() {
           value={todo}
           onChangeText={(text) => setTodo(text)}
         />
-        <TouchableOpacity style={styles.addButton} onPress={submit}>
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
+        <Pressable style={styles.addButton} onPress={submit}>
+          <Text style={styles.addButtonText}>+</Text>
+        </Pressable>
+
       </View>
 
       <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Todo List</Text>
-        {todoList.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No tasks available</Text>
-          </View>
-        ) : (
-          todoList.map((todo, index) => (
-            <View key={index} style={styles.todoContainer}>
-              <Text style={styles.todoText}>{todo}</Text>
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.completeButton]}
-                  onPress={() => completeTodo(index)}
-                >
-                  <Text style={styles.buttonText}>✔</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => deleteTodo(index)}
-                >
-                  <Text style={styles.buttonText}>✖</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
-
-      <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Completed</Text>
-        {completedList.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No completed tasks</Text>
-          </View>
-        ) : (
-          completedList.map((todo, index) => (
-            <View key={index} style={styles.todoContainer}>
-              <Text style={[styles.todoText, styles.completedText]}>{todo}</Text>
-            </View>
-          ))
-        )}
-      </View>
+  <Text style={styles.sectionTitle}>What's your today's tasks?</Text>
+  {calendarEvents.length === 0 ? (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>You slacking.</Text>
+    </View>
+  ) : (
+    <FlatList
+      data={calendarEvents}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (<TaskListItem handleDelete={deleteTaskFromCalendar} item={item} />
+       
+      )}
+      showsVerticalScrollIndicator={true} 
+    />
+  )}
+</View>
 
       <StatusBar style="light" />
     </View>
@@ -107,10 +139,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 20,
     padding: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
   },
   textInput: {
     flex: 1,
@@ -123,8 +151,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     paddingHorizontal: 15,
     paddingVertical: 10,
-    justifyContent: "center",
-    alignItems: "center",
   },
   addButtonText: {
     color: "#FFFFFF",
@@ -132,7 +158,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   listContainer: {
-    width: "100%",
+    height: "90%",
     marginBottom: 20,
   },
   sectionTitle: {
@@ -150,40 +176,15 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 15,
     marginBottom: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    backdropFilter: "blur(10px)",
   },
   todoText: {
     fontSize: 16,
     color: "#FFFFFF",
     flex: 1,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  actionButton: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  completeButton: {
-    backgroundColor: "#4CAF50",
-  },
-  deleteButton: {
-    backgroundColor: "#F44336",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-  },
-  completedText: {
+  eventDate: {
     color: "#B0BEC5",
+    fontSize: 14,
   },
   emptyContainer: {
     alignItems: "center",
