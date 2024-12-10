@@ -1,22 +1,27 @@
-import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
   TextInput,
   View,
-  TouchableOpacity,
   Alert,
   FlatList,
   Pressable,
-  Image,
+  StatusBar,
+  SafeAreaView,
 } from "react-native";
 import * as Calendar from "expo-calendar";
 import TaskListItem from "./components/TaskListItem";
 import Modal from "./components/Modal";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import PreviousTasks from "./screens/PreviousTasks";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { MaterialIcons } from "@expo/vector-icons";
 
-export default function App() {
+function HomeScreen({ navigation }) {
+  const Stack = createStackNavigator();
   const [todoList, setTodoList] = useState([]);
   const [todo, setTodo] = useState("");
   const [calendarId, setCalendarId] = useState(null);
@@ -111,24 +116,30 @@ export default function App() {
   };
 
   return (
+    <SafeAreaView style={{flex:1}}>
     <View style={styles.container}>
       <View style={styles.inputContainer}>
         <TextInput
+        autoCapitalize="none"
+        autoComplete="off"
           style={styles.textInput}
           placeholder="Enter your task"
           placeholderTextColor="rgba(255, 255, 255, 0.6)"
           value={todo}
           onChangeText={(text) => setTodo(text)}
         />
-
+  <Text style={styles.overflow}>
         <Pressable
           style={styles.addButton}
+          android_ripple={{ color: "#8379ff" }}
           onPress={() => {
-            setModalVisible(true);
+            if(todo.trim() !== ""){
+              setDate(new Date().toISOString().split("T")[0]);
+            setModalVisible(true);}
           }}
         >
           <Text style={styles.addButtonText}>+</Text>
-        </Pressable>
+        </Pressable></Text>
         <Modal visible={modalVisible}>
           <View>
             <Text style={styles.sectionTitle}>
@@ -152,7 +163,7 @@ export default function App() {
             <View>
               {showPicker && (
                 <DateTimePicker
-                  value={date ? new Date(date) : new Date()} // Default alla data attuale se `date` è vuoto
+                  value={date ? new Date(date) : new Date()} // Default alla data attuale se date è vuoto
                   mode="date"
                   display="default"
                   onChange={(event, selectedDate) => {
@@ -200,20 +211,66 @@ export default function App() {
       </View>
 
       <StatusBar style="light" />
+
+      
     </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+export default function App() {
+  const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+  return (<>
+    
+    <NavigationContainer>
+      <Tab.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          tabBarActiveTintColor: '#bb86b7',  
+          tabBarInactiveTintColor: 'gray',  
+          tabBarStyle: { backgroundColor: '#1e1e1e' }, 
+          headerStyle: { backgroundColor: '#1e1e1e' }, 
+          headerTintColor: '#bb86b7',  
+        }}
+      >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="home" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Previous Tasks"
+          component={PreviousTasks}
+          options={{
+            tabBarLabel: 'Tasks',
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="task" size={size} color={color} />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+    </NavigationContainer>
+    </>
+  );
+}
+
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#313338",
+    backgroundColor: "#423964",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 50,
+   
   },
   fancyButton: {
-    backgroundColor: "#252526",
+    backgroundColor: "#c97cff",
     borderColor: "#707070",
 
     borderWidth: 1,
@@ -230,21 +287,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 20,
     padding: 10,
+    
+   
   },
   textInput: {
     flex: 1,
     color: "#FFFFFF",
     padding: 10,
-    fontSize: 16,
+    fontSize: 16, 
+  },
+  overflow: {
+    borderRadius: 60,
   },
   addButton: {
-    backgroundColor: "#4CAF50",
-    borderRadius: 15,
+    backgroundColor: "#8379ff",
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
   addButtonText: {
-    color: "#FFFFFF",
+    color: "#eae1fd",
     fontWeight: "bold",
     fontSize: 16,
   },
@@ -267,6 +328,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 15,
     marginBottom: 10,
+    
   },
   todoText: {
     fontSize: 16,
@@ -287,10 +349,14 @@ const styles = StyleSheet.create({
   },
 
   modalButton: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#76a4fd",
     borderRadius: 15,
     paddingHorizontal: 15,
     paddingVertical: 10,
     margin: 10,
+    elevation: 15,
+    shadowOffset: { width: 0, height: 10 },
+    shadowColor: "#000000",
+    shadowRadius: 10,
   },
 });
